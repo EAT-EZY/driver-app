@@ -44,9 +44,11 @@
             border: 1px solid #444; background: #000; color: white; font-size: 1.1rem; box-sizing: border-box; 
         }
         
+        .btn-row { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 10px; }
         button { width: 100%; padding: 15px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-add { background-color: var(--ee-yellow); color: black; margin-bottom: 10px; font-size: 1rem; }
-        .btn-end { background-color: var(--ee-red); color: white; font-size: 0.9rem; }
+        .btn-add { background-color: var(--ee-yellow); color: black; font-size: 1rem; }
+        .btn-redo { background-color: var(--ee-red); color: white; font-size: 0.8rem; }
+        .btn-end { background-color: #333; color: var(--ee-yellow); border: 1px solid var(--ee-yellow); font-size: 0.9rem; }
 
         .goal-container { background: #111; padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #333; }
         .progress-bg { background: #333; height: 12px; border-radius: 6px; overflow: hidden; margin: 10px 0; }
@@ -58,7 +60,8 @@
         td { padding: 12px; border-bottom: 1px solid #333; font-size: 0.9rem; }
         .total-row { font-weight: bold; background: #000; color: var(--ee-yellow); }
 
-        .footer-btns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 20px; }
+        .footer-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn-reset { background-color: var(--ee-red); color: white; }
     </style>
 </head>
 <body>
@@ -79,8 +82,12 @@
         <input type="number" id="delFee" placeholder="0.00" inputmode="decimal">
         <label>Tip ($)</label>
         <input type="number" id="tipAmount" placeholder="0.00" inputmode="decimal">
-        <button class="btn-add" onclick="addJob()">ADD JOB</button>
-        <button class="btn-end" onclick="endShift()">END SHIFT & LOG</button>
+        
+        <div class="btn-row">
+            <button class="btn-add" onclick="addJob()">ADD JOB</button>
+            <button class="btn-redo" onclick="redoLastJob()">REDO</button>
+        </div>
+        <button class="btn-end" onclick="endShift()">END SHIFT & LOG WEEKLY</button>
     </div>
 
     <div class="goal-container">
@@ -98,13 +105,12 @@
 
     <div class="footer-btns">
         <button class="btn-add" onclick="exportData()">EXPORT REPORT</button>
-        <button class="btn-end" onclick="resetHistory()">RESET</button>
+        <button class="btn-reset" onclick="resetHistory()">RESET ALL</button>
     </div>
 </div>
 
 <script>
-    // LOAD SAVED DATA IMMEDIATELY
-    let currentShift = JSON.parse(localStorage.getItem('ee_current_shift')) || { jobs: 0, earnings: 0 };
+    let currentShift = JSON.parse(localStorage.getItem('ee_current_shift')) || { jobs: 0, earnings: 0, lastJobValue: 0 };
     let history = JSON.parse(localStorage.getItem('ee_history')) || [];
     let myGoal = localStorage.getItem('ee_goal') || 0;
 
@@ -140,15 +146,32 @@
         if (fee <= 0) return;
 
         const net = (fee / 1.1) * 0.75 + tip;
+        
+        // Track last job value for the Redo button
+        currentShift.lastJobValue = net;
         currentShift.jobs++;
         currentShift.earnings += net;
 
-        // CRITICAL: Save current shift progress to memory
         localStorage.setItem('ee_current_shift', JSON.stringify(currentShift));
 
         document.getElementById('delFee').value = '';
         document.getElementById('tipAmount').value = '';
         updateUI();
+    }
+
+    function redoLastJob() {
+        if (currentShift.jobs > 0) {
+            if (confirm("Remove the last job from this shift?")) {
+                currentShift.earnings -= (currentShift.lastJobValue || 0);
+                currentShift.jobs--;
+                currentShift.lastJobValue = 0; 
+                
+                localStorage.setItem('ee_current_shift', JSON.stringify(currentShift));
+                updateUI();
+            }
+        } else {
+            alert("Nothing to undo.");
+        }
     }
 
     function endShift() {
@@ -160,13 +183,10 @@
                 pay: currentShift.earnings
             });
             if (history.length > 7) history.shift();
-            
             localStorage.setItem('ee_history', JSON.stringify(history));
             
-            // Clear current shift from memory
-            currentShift = { jobs: 0, earnings: 0 };
+            currentShift = { jobs: 0, earnings: 0, lastJobValue: 0 };
             localStorage.removeItem('ee_current_shift');
-            
             updateUI();
         }
     }
@@ -178,9 +198,9 @@
     }
 
     function resetHistory() {
-        if (confirm("Clear all data?")) {
+        if (confirm("This will clear ALL shift history and targets. Proceed?")) {
             history = [];
-            currentShift = { jobs: 0, earnings: 0 };
+            currentShift = { jobs: 0, earnings: 0, lastJobValue: 0 };
             localStorage.clear();
             updateUI();
         }
