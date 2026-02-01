@@ -58,9 +58,6 @@
         td { padding: 12px; border-bottom: 1px solid #333; font-size: 0.9rem; }
         .total-row { font-weight: bold; background: #000; color: var(--ee-yellow); }
 
-        .faq { margin-top: 30px; padding: 15px; background: #0a0a0a; border-radius: 10px; font-size: 0.85rem; color: #ccc; border: 1px dashed #333; }
-        .faq h4 { color: var(--ee-yellow); margin-top: 0; }
-        
         .footer-btns { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-top: 20px; }
     </style>
 </head>
@@ -103,16 +100,11 @@
         <button class="btn-add" onclick="exportData()">EXPORT REPORT</button>
         <button class="btn-end" onclick="resetHistory()">RESET</button>
     </div>
-
-    <div class="faq">
-        <h4>Earnings Info</h4>
-        <p><strong>Formula:</strong> (Fee - 10% GST) x 75% + 100% Tips.</p>
-        <p><strong>Storage:</strong> Data is saved to your phone. Management only sees what you export.</p>
-    </div>
 </div>
 
 <script>
-    let currentShift = { jobs: 0, earnings: 0 };
+    // LOAD SAVED DATA IMMEDIATELY
+    let currentShift = JSON.parse(localStorage.getItem('ee_current_shift')) || { jobs: 0, earnings: 0 };
     let history = JSON.parse(localStorage.getItem('ee_history')) || [];
     let myGoal = localStorage.getItem('ee_goal') || 0;
 
@@ -151,6 +143,9 @@
         currentShift.jobs++;
         currentShift.earnings += net;
 
+        // CRITICAL: Save current shift progress to memory
+        localStorage.setItem('ee_current_shift', JSON.stringify(currentShift));
+
         document.getElementById('delFee').value = '';
         document.getElementById('tipAmount').value = '';
         updateUI();
@@ -165,8 +160,13 @@
                 pay: currentShift.earnings
             });
             if (history.length > 7) history.shift();
+            
             localStorage.setItem('ee_history', JSON.stringify(history));
+            
+            // Clear current shift from memory
             currentShift = { jobs: 0, earnings: 0 };
+            localStorage.removeItem('ee_current_shift');
+            
             updateUI();
         }
     }
@@ -180,7 +180,8 @@
     function resetHistory() {
         if (confirm("Clear all data?")) {
             history = [];
-            localStorage.removeItem('ee_history');
+            currentShift = { jobs: 0, earnings: 0 };
+            localStorage.clear();
             updateUI();
         }
     }
